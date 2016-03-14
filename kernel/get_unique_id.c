@@ -10,7 +10,7 @@ spinlock_t my_lock;
 asmlinkage long sys_get_unique_id(int *uuid)
 {
 	if (!access_ok(int*, uuid, sizeof(int)))
-		return -1000;
+		return -EFAULT;
 	spin_lock(&my_lock);
 	count = count + 1;	
 	put_user(count, uuid);
