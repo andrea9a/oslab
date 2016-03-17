@@ -2,7 +2,7 @@
 # Makefile for the linux kernel.
 #
 
-obj-y     = get_unique_id.o hello_world.o fork.o \
+obj-y     = get_child_pids.o get_unique_id.o hello_world.o fork.o \
 	exec_domain.o panic.o \
 	    cpu.o exit.o softirq.o resource.o \
 	    sysctl.o sysctl_binary.o capability.o ptrace.o user.o \
