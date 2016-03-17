@@ -1,0 +1,1134 @@
+diff --git a/Hello b/Hello
+new file mode 100644
+index 0000000..e69de29
+diff --git a/arch/x86/syscalls/syscall_32.tbl b/arch/x86/syscalls/syscall_32.tbl
+index 9fe1b5d..0d804c7 100644
+--- a/arch/x86/syscalls/syscall_32.tbl
++++ b/arch/x86/syscalls/syscall_32.tbl
+@@ -364,3 +364,5 @@
+ 355	i386	getrandom		sys_getrandom
+ 356	i386	memfd_create		sys_memfd_create
+ 357	i386	bpf			sys_bpf
++358	i386	hello_world		sys_hello_world
++359	i386	get_unique_id		sys_get_unique_id
+diff --git a/arch/x86/syscalls/syscall_64.tbl b/arch/x86/syscalls/syscall_64.tbl
+index 281150b..845b59d 100644
+--- a/arch/x86/syscalls/syscall_64.tbl
++++ b/arch/x86/syscalls/syscall_64.tbl
+@@ -366,3 +366,5 @@
+ 542	x32	getsockopt		compat_sys_getsockopt
+ 543	x32	io_setup		compat_sys_io_setup
+ 544	x32	io_submit		compat_sys_io_submit
++545	common	hello_world		sys_hello_world
++546	common	get_unique_id		sys_get_unique_id
+diff --git a/create_patch.sh b/create_patch.sh
+new file mode 100755
+index 0000000..df97ba3
+--- /dev/null
++++ b/create_patch.sh
+@@ -0,0 +1,22 @@
++#!/bin/bash
++
++REFERENCE_COMMIT="1bce8c5c"
++
++if [ $# -ne 1 ]; then
++    echo "Usage: $0 PATCH_FILE_NAME"
++fi
++
++if [ -f $1 ]; then
++    echo "File $1 already exists. Quitting."
++    exit 1
++fi
++
++pushd .
++cd /usr/src/linux
++make distclean
++git checkout .config
++git -c core.fileMode=false add -A
++git commit -m "Student solution patch"
++git -c core.fileMode=false diff $REFERENCE_COMMIT HEAD > $1
++popd
++mv /usr/src/linux/$1 .
+diff --git a/include/linux/syscalls.h b/include/linux/syscalls.h
+index bda9b81..829c8ff 100644
+--- a/include/linux/syscalls.h
++++ b/include/linux/syscalls.h
+@@ -877,4 +877,6 @@ asmlinkage long sys_seccomp(unsigned int op, unsigned int flags,
+ asmlinkage long sys_getrandom(char __user *buf, size_t count,
+ 			      unsigned int flags);
+ asmlinkage long sys_bpf(int cmd, union bpf_attr *attr, unsigned int size);
++asmlinkage long sys_hello_world(int i);
++asmlinkage long sys_get_unique_id(int* uuid);
+ #endif
+diff --git a/kernel/Makefile b/kernel/Makefile
+index 17ea6d4..c6ff868 100644
+--- a/kernel/Makefile
++++ b/kernel/Makefile
+@@ -2,7 +2,8 @@
+ # Makefile for the linux kernel.
+ #
+ 
+-obj-y     = fork.o exec_domain.o panic.o \
++obj-y     = get_unique_id.o hello_world.o fork.o \
++	exec_domain.o panic.o \
+ 	    cpu.o exit.o softirq.o resource.o \
+ 	    sysctl.o sysctl_binary.o capability.o ptrace.o user.o \
+ 	    signal.o sys.o kmod.o workqueue.o pid.o task_work.o \
+diff --git a/kernel/get_child_pids.c b/kernel/get_child_pids.c
+new file mode 100644
+index 0000000..faf03e6
+--- /dev/null
++++ b/kernel/get_child_pids.c
+@@ -0,0 +1,17 @@
++#include <linux/types.h>
++#include <linux/spinlock.h>
++#include <asm/uaccess.h>
++#include <linux/sched.h>
++#include <linux/list.h>
++#include <linux/sys.h>
++#include <linux/slab.h>
++
++asmlinkage long sys_get_child_pids(pid_t* list, size_t limit, size_t* num_children)
++{
++	if(!access_ok(pid_t*, list, sizeof(pid_t)))
++		return -EFAULT;
++	else {
++		task_struct* current = find_task_by_vpid(getpid());
++	}
++	return 0;
++}		
+diff --git a/kernel/get_unique_id.c b/kernel/get_unique_id.c
+new file mode 100644
+index 0000000..10751bd
+--- /dev/null
++++ b/kernel/get_unique_id.c
+@@ -0,0 +1,19 @@
++#include <linux/linkage.h>
++#include <linux/kernel.h>
++#include <linux/types.h>
++#include <asm/atomic.h>
++#include <linux/spinlock.h>
++#include <asm/uaccess.h>
++
++int count = 0;
++spinlock_t my_lock;
++asmlinkage long sys_get_unique_id(int *uuid)
++{
++	if (!access_ok(int*, uuid, sizeof(int)))
++		return -EFAULT;
++	spin_lock(&my_lock);
++	count = count + 1;	
++	put_user(count, uuid);
++	spin_unlock(&my_lock);
++	return 0;
++}
+diff --git a/kernel/hello_world.c b/kernel/hello_world.c
+new file mode 100644
+index 0000000..1e0b345
+--- /dev/null
++++ b/kernel/hello_world.c
+@@ -0,0 +1,7 @@
++#include <linux/linkage.h>
++#include <linux/kernel.h>
++asmlinkage long sys_hello_world(int i)
++{
++	printk("Hello world syscall: %d\n",i);
++	return 0;
++}
+diff --git a/kernel/patch1 b/kernel/patch1
+new file mode 100644
+index 0000000..dcb50fc
+--- /dev/null
++++ b/kernel/patch1
+@@ -0,0 +1,224 @@
++diff --git a/Hello b/Hello
++new file mode 100644
++index 0000000..e69de29
++diff --git a/arch/x86/syscalls/syscall_32.tbl b/arch/x86/syscalls/syscall_32.tbl
++index 9fe1b5d..0d804c7 100644
++--- a/arch/x86/syscalls/syscall_32.tbl
+++++ b/arch/x86/syscalls/syscall_32.tbl
++@@ -364,3 +364,5 @@
++ 355	i386	getrandom		sys_getrandom
++ 356	i386	memfd_create		sys_memfd_create
++ 357	i386	bpf			sys_bpf
+++358	i386	hello_world		sys_hello_world
+++359	i386	get_unique_id		sys_get_unique_id
++diff --git a/arch/x86/syscalls/syscall_64.tbl b/arch/x86/syscalls/syscall_64.tbl
++index 281150b..845b59d 100644
++--- a/arch/x86/syscalls/syscall_64.tbl
+++++ b/arch/x86/syscalls/syscall_64.tbl
++@@ -366,3 +366,5 @@
++ 542	x32	getsockopt		compat_sys_getsockopt
++ 543	x32	io_setup		compat_sys_io_setup
++ 544	x32	io_submit		compat_sys_io_submit
+++545	common	hello_world		sys_hello_world
+++546	common	get_unique_id		sys_get_unique_id
++diff --git a/include/linux/syscalls.h b/include/linux/syscalls.h
++index bda9b81..829c8ff 100644
++--- a/include/linux/syscalls.h
+++++ b/include/linux/syscalls.h
++@@ -877,4 +877,6 @@ asmlinkage long sys_seccomp(unsigned int op, unsigned int flags,
++ asmlinkage long sys_getrandom(char __user *buf, size_t count,
++ 			      unsigned int flags);
++ asmlinkage long sys_bpf(int cmd, union bpf_attr *attr, unsigned int size);
+++asmlinkage long sys_hello_world(int i);
+++asmlinkage long sys_get_unique_id(int* uuid);
++ #endif
++diff --git a/kernel/Makefile b/kernel/Makefile
++index 17ea6d4..e542bb4 100644
++--- a/kernel/Makefile
+++++ b/kernel/Makefile
++@@ -2,7 +2,8 @@
++ # Makefile for the linux kernel.
++ #
++ 
++-obj-y     = fork.o exec_domain.o panic.o \
+++obj-y     = get_child_pids.o get_unique_id.o hello_world.o fork.o \
+++	exec_domain.o panic.o \
++ 	    cpu.o exit.o softirq.o resource.o \
++ 	    sysctl.o sysctl_binary.o capability.o ptrace.o user.o \
++ 	    signal.o sys.o kmod.o workqueue.o pid.o task_work.o \
++diff --git a/kernel/get_child_pids.c b/kernel/get_child_pids.c
++new file mode 100644
++index 0000000..faf03e6
++--- /dev/null
+++++ b/kernel/get_child_pids.c
++@@ -0,0 +1,17 @@
+++#include <linux/types.h>
+++#include <linux/spinlock.h>
+++#include <asm/uaccess.h>
+++#include <linux/sched.h>
+++#include <linux/list.h>
+++#include <linux/sys.h>
+++#include <linux/slab.h>
+++
+++asmlinkage long sys_get_child_pids(pid_t* list, size_t limit, size_t* num_children)
+++{
+++	if(!access_ok(pid_t*, list, sizeof(pid_t)))
+++		return -EFAULT;
+++	else {
+++		task_struct* current = find_task_by_vpid(getpid());
+++	}
+++	return 0;
+++}		
++diff --git a/kernel/get_unique_id.c b/kernel/get_unique_id.c
++new file mode 100644
++index 0000000..10751bd
++--- /dev/null
+++++ b/kernel/get_unique_id.c
++@@ -0,0 +1,19 @@
+++#include <linux/linkage.h>
+++#include <linux/kernel.h>
+++#include <linux/types.h>
+++#include <asm/atomic.h>
+++#include <linux/spinlock.h>
+++#include <asm/uaccess.h>
+++
+++int count = 0;
+++spinlock_t my_lock;
+++asmlinkage long sys_get_unique_id(int *uuid)
+++{
+++	if (!access_ok(int*, uuid, sizeof(int)))
+++		return -EFAULT;
+++	spin_lock(&my_lock);
+++	count = count + 1;	
+++	put_user(count, uuid);
+++	spin_unlock(&my_lock);
+++	return 0;
+++}
++diff --git a/kernel/hello_world.c b/kernel/hello_world.c
++new file mode 100644
++index 0000000..1e0b345
++--- /dev/null
+++++ b/kernel/hello_world.c
++@@ -0,0 +1,7 @@
+++#include <linux/linkage.h>
+++#include <linux/kernel.h>
+++asmlinkage long sys_hello_world(int i)
+++{
+++	printk("Hello world syscall: %d\n",i);
+++	return 0;
+++}
++diff --git a/patch1 b/patch1
++new file mode 100644
++index 0000000..ca72378
++--- /dev/null
+++++ b/patch1
++@@ -0,0 +1,109 @@
+++diff --git a/Hello b/Hello
+++new file mode 100644
+++index 0000000..e69de29
+++diff --git a/arch/x86/syscalls/syscall_32.tbl b/arch/x86/syscalls/syscall_32.tbl
+++index 9fe1b5d..0d804c7 100644
+++--- a/arch/x86/syscalls/syscall_32.tbl
++++++ b/arch/x86/syscalls/syscall_32.tbl
+++@@ -364,3 +364,5 @@
+++ 355	i386	getrandom		sys_getrandom
+++ 356	i386	memfd_create		sys_memfd_create
+++ 357	i386	bpf			sys_bpf
++++358	i386	hello_world		sys_hello_world
++++359	i386	get_unique_id		sys_get_unique_id
+++diff --git a/arch/x86/syscalls/syscall_64.tbl b/arch/x86/syscalls/syscall_64.tbl
+++index 281150b..845b59d 100644
+++--- a/arch/x86/syscalls/syscall_64.tbl
++++++ b/arch/x86/syscalls/syscall_64.tbl
+++@@ -366,3 +366,5 @@
+++ 542	x32	getsockopt		compat_sys_getsockopt
+++ 543	x32	io_setup		compat_sys_io_setup
+++ 544	x32	io_submit		compat_sys_io_submit
++++545	common	hello_world		sys_hello_world
++++546	common	get_unique_id		sys_get_unique_id
+++diff --git a/include/linux/syscalls.h b/include/linux/syscalls.h
+++index bda9b81..829c8ff 100644
+++--- a/include/linux/syscalls.h
++++++ b/include/linux/syscalls.h
+++@@ -877,4 +877,6 @@ asmlinkage long sys_seccomp(unsigned int op, unsigned int flags,
+++ asmlinkage long sys_getrandom(char __user *buf, size_t count,
+++ 			      unsigned int flags);
+++ asmlinkage long sys_bpf(int cmd, union bpf_attr *attr, unsigned int size);
++++asmlinkage long sys_hello_world(int i);
++++asmlinkage long sys_get_unique_id(int* uuid);
+++ #endif
+++diff --git a/kernel/Makefile b/kernel/Makefile
+++index 17ea6d4..e542bb4 100644
+++--- a/kernel/Makefile
++++++ b/kernel/Makefile
+++@@ -2,7 +2,8 @@
+++ # Makefile for the linux kernel.
+++ #
+++ 
+++-obj-y     = fork.o exec_domain.o panic.o \
++++obj-y     = get_child_pids.o get_unique_id.o hello_world.o fork.o \
++++	exec_domain.o panic.o \
+++ 	    cpu.o exit.o softirq.o resource.o \
+++ 	    sysctl.o sysctl_binary.o capability.o ptrace.o user.o \
+++ 	    signal.o sys.o kmod.o workqueue.o pid.o task_work.o \
+++diff --git a/kernel/get_child_pids.c b/kernel/get_child_pids.c
+++new file mode 100644
+++index 0000000..faf03e6
+++--- /dev/null
++++++ b/kernel/get_child_pids.c
+++@@ -0,0 +1,17 @@
++++#include <linux/types.h>
++++#include <linux/spinlock.h>
++++#include <asm/uaccess.h>
++++#include <linux/sched.h>
++++#include <linux/list.h>
++++#include <linux/sys.h>
++++#include <linux/slab.h>
++++
++++asmlinkage long sys_get_child_pids(pid_t* list, size_t limit, size_t* num_children)
++++{
++++	if(!access_ok(pid_t*, list, sizeof(pid_t)))
++++		return -EFAULT;
++++	else {
++++		task_struct* current = find_task_by_vpid(getpid());
++++	}
++++	return 0;
++++}		
+++diff --git a/kernel/get_unique_id.c b/kernel/get_unique_id.c
+++new file mode 100644
+++index 0000000..10751bd
+++--- /dev/null
++++++ b/kernel/get_unique_id.c
+++@@ -0,0 +1,19 @@
++++#include <linux/linkage.h>
++++#include <linux/kernel.h>
++++#include <linux/types.h>
++++#include <asm/atomic.h>
++++#include <linux/spinlock.h>
++++#include <asm/uaccess.h>
++++
++++int count = 0;
++++spinlock_t my_lock;
++++asmlinkage long sys_get_unique_id(int *uuid)
++++{
++++	if (!access_ok(int*, uuid, sizeof(int)))
++++		return -EFAULT;
++++	spin_lock(&my_lock);
++++	count = count + 1;	
++++	put_user(count, uuid);
++++	spin_unlock(&my_lock);
++++	return 0;
++++}
+++diff --git a/kernel/hello_world.c b/kernel/hello_world.c
+++new file mode 100644
+++index 0000000..1e0b345
+++--- /dev/null
++++++ b/kernel/hello_world.c
+++@@ -0,0 +1,7 @@
++++#include <linux/linkage.h>
++++#include <linux/kernel.h>
++++asmlinkage long sys_hello_world(int i)
++++{
++++	printk("Hello world syscall: %d\n",i);
++++	return 0;
++++}
+diff --git a/linux-3.18.3 b/linux-3.18.3
+new file mode 160000
+index 0000000..1bce8c5
+--- /dev/null
++++ b/linux-3.18.3
+@@ -0,0 +1 @@
++Subproject commit 1bce8c5c6d565c1b7720709e1a83cf418d19618f
+diff --git a/patch b/patch
+new file mode 100644
+index 0000000..8dfb4af
+--- /dev/null
++++ b/patch
+@@ -0,0 +1,754 @@
++diff --git a/Hello b/Hello
++new file mode 100644
++index 0000000..e69de29
++diff --git a/arch/x86/syscalls/syscall_32.tbl b/arch/x86/syscalls/syscall_32.tbl
++index 9fe1b5d..0d804c7 100644
++--- a/arch/x86/syscalls/syscall_32.tbl
+++++ b/arch/x86/syscalls/syscall_32.tbl
++@@ -364,3 +364,5 @@
++ 355	i386	getrandom		sys_getrandom
++ 356	i386	memfd_create		sys_memfd_create
++ 357	i386	bpf			sys_bpf
+++358	i386	hello_world		sys_hello_world
+++359	i386	get_unique_id		sys_get_unique_id
++diff --git a/arch/x86/syscalls/syscall_64.tbl b/arch/x86/syscalls/syscall_64.tbl
++index 281150b..845b59d 100644
++--- a/arch/x86/syscalls/syscall_64.tbl
+++++ b/arch/x86/syscalls/syscall_64.tbl
++@@ -366,3 +366,5 @@
++ 542	x32	getsockopt		compat_sys_getsockopt
++ 543	x32	io_setup		compat_sys_io_setup
++ 544	x32	io_submit		compat_sys_io_submit
+++545	common	hello_world		sys_hello_world
+++546	common	get_unique_id		sys_get_unique_id
++diff --git a/create_patch.sh b/create_patch.sh
++new file mode 100755
++index 0000000..df97ba3
++--- /dev/null
+++++ b/create_patch.sh
++@@ -0,0 +1,22 @@
+++#!/bin/bash
+++
+++REFERENCE_COMMIT="1bce8c5c"
+++
+++if [ $# -ne 1 ]; then
+++    echo "Usage: $0 PATCH_FILE_NAME"
+++fi
+++
+++if [ -f $1 ]; then
+++    echo "File $1 already exists. Quitting."
+++    exit 1
+++fi
+++
+++pushd .
+++cd /usr/src/linux
+++make distclean
+++git checkout .config
+++git -c core.fileMode=false add -A
+++git commit -m "Student solution patch"
+++git -c core.fileMode=false diff $REFERENCE_COMMIT HEAD > $1
+++popd
+++mv /usr/src/linux/$1 .
++diff --git a/include/linux/syscalls.h b/include/linux/syscalls.h
++index bda9b81..829c8ff 100644
++--- a/include/linux/syscalls.h
+++++ b/include/linux/syscalls.h
++@@ -877,4 +877,6 @@ asmlinkage long sys_seccomp(unsigned int op, unsigned int flags,
++ asmlinkage long sys_getrandom(char __user *buf, size_t count,
++ 			      unsigned int flags);
++ asmlinkage long sys_bpf(int cmd, union bpf_attr *attr, unsigned int size);
+++asmlinkage long sys_hello_world(int i);
+++asmlinkage long sys_get_unique_id(int* uuid);
++ #endif
++diff --git a/kernel/Makefile b/kernel/Makefile
++index 17ea6d4..e542bb4 100644
++--- a/kernel/Makefile
+++++ b/kernel/Makefile
++@@ -2,7 +2,8 @@
++ # Makefile for the linux kernel.
++ #
++ 
++-obj-y     = fork.o exec_domain.o panic.o \
+++obj-y     = get_child_pids.o get_unique_id.o hello_world.o fork.o \
+++	exec_domain.o panic.o \
++ 	    cpu.o exit.o softirq.o resource.o \
++ 	    sysctl.o sysctl_binary.o capability.o ptrace.o user.o \
++ 	    signal.o sys.o kmod.o workqueue.o pid.o task_work.o \
++diff --git a/kernel/get_child_pids.c b/kernel/get_child_pids.c
++new file mode 100644
++index 0000000..faf03e6
++--- /dev/null
+++++ b/kernel/get_child_pids.c
++@@ -0,0 +1,17 @@
+++#include <linux/types.h>
+++#include <linux/spinlock.h>
+++#include <asm/uaccess.h>
+++#include <linux/sched.h>
+++#include <linux/list.h>
+++#include <linux/sys.h>
+++#include <linux/slab.h>
+++
+++asmlinkage long sys_get_child_pids(pid_t* list, size_t limit, size_t* num_children)
+++{
+++	if(!access_ok(pid_t*, list, sizeof(pid_t)))
+++		return -EFAULT;
+++	else {
+++		task_struct* current = find_task_by_vpid(getpid());
+++	}
+++	return 0;
+++}		
++diff --git a/kernel/get_unique_id.c b/kernel/get_unique_id.c
++new file mode 100644
++index 0000000..10751bd
++--- /dev/null
+++++ b/kernel/get_unique_id.c
++@@ -0,0 +1,19 @@
+++#include <linux/linkage.h>
+++#include <linux/kernel.h>
+++#include <linux/types.h>
+++#include <asm/atomic.h>
+++#include <linux/spinlock.h>
+++#include <asm/uaccess.h>
+++
+++int count = 0;
+++spinlock_t my_lock;
+++asmlinkage long sys_get_unique_id(int *uuid)
+++{
+++	if (!access_ok(int*, uuid, sizeof(int)))
+++		return -EFAULT;
+++	spin_lock(&my_lock);
+++	count = count + 1;	
+++	put_user(count, uuid);
+++	spin_unlock(&my_lock);
+++	return 0;
+++}
++diff --git a/kernel/hello_world.c b/kernel/hello_world.c
++new file mode 100644
++index 0000000..1e0b345
++--- /dev/null
+++++ b/kernel/hello_world.c
++@@ -0,0 +1,7 @@
+++#include <linux/linkage.h>
+++#include <linux/kernel.h>
+++asmlinkage long sys_hello_world(int i)
+++{
+++	printk("Hello world syscall: %d\n",i);
+++	return 0;
+++}
++diff --git a/kernel/patch1 b/kernel/patch1
++new file mode 100644
++index 0000000..dcb50fc
++--- /dev/null
+++++ b/kernel/patch1
++@@ -0,0 +1,224 @@
+++diff --git a/Hello b/Hello
+++new file mode 100644
+++index 0000000..e69de29
+++diff --git a/arch/x86/syscalls/syscall_32.tbl b/arch/x86/syscalls/syscall_32.tbl
+++index 9fe1b5d..0d804c7 100644
+++--- a/arch/x86/syscalls/syscall_32.tbl
++++++ b/arch/x86/syscalls/syscall_32.tbl
+++@@ -364,3 +364,5 @@
+++ 355	i386	getrandom		sys_getrandom
+++ 356	i386	memfd_create		sys_memfd_create
+++ 357	i386	bpf			sys_bpf
++++358	i386	hello_world		sys_hello_world
++++359	i386	get_unique_id		sys_get_unique_id
+++diff --git a/arch/x86/syscalls/syscall_64.tbl b/arch/x86/syscalls/syscall_64.tbl
+++index 281150b..845b59d 100644
+++--- a/arch/x86/syscalls/syscall_64.tbl
++++++ b/arch/x86/syscalls/syscall_64.tbl
+++@@ -366,3 +366,5 @@
+++ 542	x32	getsockopt		compat_sys_getsockopt
+++ 543	x32	io_setup		compat_sys_io_setup
+++ 544	x32	io_submit		compat_sys_io_submit
++++545	common	hello_world		sys_hello_world
++++546	common	get_unique_id		sys_get_unique_id
+++diff --git a/include/linux/syscalls.h b/include/linux/syscalls.h
+++index bda9b81..829c8ff 100644
+++--- a/include/linux/syscalls.h
++++++ b/include/linux/syscalls.h
+++@@ -877,4 +877,6 @@ asmlinkage long sys_seccomp(unsigned int op, unsigned int flags,
+++ asmlinkage long sys_getrandom(char __user *buf, size_t count,
+++ 			      unsigned int flags);
+++ asmlinkage long sys_bpf(int cmd, union bpf_attr *attr, unsigned int size);
++++asmlinkage long sys_hello_world(int i);
++++asmlinkage long sys_get_unique_id(int* uuid);
+++ #endif
+++diff --git a/kernel/Makefile b/kernel/Makefile
+++index 17ea6d4..e542bb4 100644
+++--- a/kernel/Makefile
++++++ b/kernel/Makefile
+++@@ -2,7 +2,8 @@
+++ # Makefile for the linux kernel.
+++ #
+++ 
+++-obj-y     = fork.o exec_domain.o panic.o \
++++obj-y     = get_child_pids.o get_unique_id.o hello_world.o fork.o \
++++	exec_domain.o panic.o \
+++ 	    cpu.o exit.o softirq.o resource.o \
+++ 	    sysctl.o sysctl_binary.o capability.o ptrace.o user.o \
+++ 	    signal.o sys.o kmod.o workqueue.o pid.o task_work.o \
+++diff --git a/kernel/get_child_pids.c b/kernel/get_child_pids.c
+++new file mode 100644
+++index 0000000..faf03e6
+++--- /dev/null
++++++ b/kernel/get_child_pids.c
+++@@ -0,0 +1,17 @@
++++#include <linux/types.h>
++++#include <linux/spinlock.h>
++++#include <asm/uaccess.h>
++++#include <linux/sched.h>
++++#include <linux/list.h>
++++#include <linux/sys.h>
++++#include <linux/slab.h>
++++
++++asmlinkage long sys_get_child_pids(pid_t* list, size_t limit, size_t* num_children)
++++{
++++	if(!access_ok(pid_t*, list, sizeof(pid_t)))
++++		return -EFAULT;
++++	else {
++++		task_struct* current = find_task_by_vpid(getpid());
++++	}
++++	return 0;
++++}		
+++diff --git a/kernel/get_unique_id.c b/kernel/get_unique_id.c
+++new file mode 100644
+++index 0000000..10751bd
+++--- /dev/null
++++++ b/kernel/get_unique_id.c
+++@@ -0,0 +1,19 @@
++++#include <linux/linkage.h>
++++#include <linux/kernel.h>
++++#include <linux/types.h>
++++#include <asm/atomic.h>
++++#include <linux/spinlock.h>
++++#include <asm/uaccess.h>
++++
++++int count = 0;
++++spinlock_t my_lock;
++++asmlinkage long sys_get_unique_id(int *uuid)
++++{
++++	if (!access_ok(int*, uuid, sizeof(int)))
++++		return -EFAULT;
++++	spin_lock(&my_lock);
++++	count = count + 1;	
++++	put_user(count, uuid);
++++	spin_unlock(&my_lock);
++++	return 0;
++++}
+++diff --git a/kernel/hello_world.c b/kernel/hello_world.c
+++new file mode 100644
+++index 0000000..1e0b345
+++--- /dev/null
++++++ b/kernel/hello_world.c
+++@@ -0,0 +1,7 @@
++++#include <linux/linkage.h>
++++#include <linux/kernel.h>
++++asmlinkage long sys_hello_world(int i)
++++{
++++	printk("Hello world syscall: %d\n",i);
++++	return 0;
++++}
+++diff --git a/patch1 b/patch1
+++new file mode 100644
+++index 0000000..ca72378
+++--- /dev/null
++++++ b/patch1
+++@@ -0,0 +1,109 @@
++++diff --git a/Hello b/Hello
++++new file mode 100644
++++index 0000000..e69de29
++++diff --git a/arch/x86/syscalls/syscall_32.tbl b/arch/x86/syscalls/syscall_32.tbl
++++index 9fe1b5d..0d804c7 100644
++++--- a/arch/x86/syscalls/syscall_32.tbl
+++++++ b/arch/x86/syscalls/syscall_32.tbl
++++@@ -364,3 +364,5 @@
++++ 355	i386	getrandom		sys_getrandom
++++ 356	i386	memfd_create		sys_memfd_create
++++ 357	i386	bpf			sys_bpf
+++++358	i386	hello_world		sys_hello_world
+++++359	i386	get_unique_id		sys_get_unique_id
++++diff --git a/arch/x86/syscalls/syscall_64.tbl b/arch/x86/syscalls/syscall_64.tbl
++++index 281150b..845b59d 100644
++++--- a/arch/x86/syscalls/syscall_64.tbl
+++++++ b/arch/x86/syscalls/syscall_64.tbl
++++@@ -366,3 +366,5 @@
++++ 542	x32	getsockopt		compat_sys_getsockopt
++++ 543	x32	io_setup		compat_sys_io_setup
++++ 544	x32	io_submit		compat_sys_io_submit
+++++545	common	hello_world		sys_hello_world
+++++546	common	get_unique_id		sys_get_unique_id
++++diff --git a/include/linux/syscalls.h b/include/linux/syscalls.h
++++index bda9b81..829c8ff 100644
++++--- a/include/linux/syscalls.h
+++++++ b/include/linux/syscalls.h
++++@@ -877,4 +877,6 @@ asmlinkage long sys_seccomp(unsigned int op, unsigned int flags,
++++ asmlinkage long sys_getrandom(char __user *buf, size_t count,
++++ 			      unsigned int flags);
++++ asmlinkage long sys_bpf(int cmd, union bpf_attr *attr, unsigned int size);
+++++asmlinkage long sys_hello_world(int i);
+++++asmlinkage long sys_get_unique_id(int* uuid);
++++ #endif
++++diff --git a/kernel/Makefile b/kernel/Makefile
++++index 17ea6d4..e542bb4 100644
++++--- a/kernel/Makefile
+++++++ b/kernel/Makefile
++++@@ -2,7 +2,8 @@
++++ # Makefile for the linux kernel.
++++ #
++++ 
++++-obj-y     = fork.o exec_domain.o panic.o \
+++++obj-y     = get_child_pids.o get_unique_id.o hello_world.o fork.o \
+++++	exec_domain.o panic.o \
++++ 	    cpu.o exit.o softirq.o resource.o \
++++ 	    sysctl.o sysctl_binary.o capability.o ptrace.o user.o \
++++ 	    signal.o sys.o kmod.o workqueue.o pid.o task_work.o \
++++diff --git a/kernel/get_child_pids.c b/kernel/get_child_pids.c
++++new file mode 100644
++++index 0000000..faf03e6
++++--- /dev/null
+++++++ b/kernel/get_child_pids.c
++++@@ -0,0 +1,17 @@
+++++#include <linux/types.h>
+++++#include <linux/spinlock.h>
+++++#include <asm/uaccess.h>
+++++#include <linux/sched.h>
+++++#include <linux/list.h>
+++++#include <linux/sys.h>
+++++#include <linux/slab.h>
+++++
+++++asmlinkage long sys_get_child_pids(pid_t* list, size_t limit, size_t* num_children)
+++++{
+++++	if(!access_ok(pid_t*, list, sizeof(pid_t)))
+++++		return -EFAULT;
+++++	else {
+++++		task_struct* current = find_task_by_vpid(getpid());
+++++	}
+++++	return 0;
+++++}		
++++diff --git a/kernel/get_unique_id.c b/kernel/get_unique_id.c
++++new file mode 100644
++++index 0000000..10751bd
++++--- /dev/null
+++++++ b/kernel/get_unique_id.c
++++@@ -0,0 +1,19 @@
+++++#include <linux/linkage.h>
+++++#include <linux/kernel.h>
+++++#include <linux/types.h>
+++++#include <asm/atomic.h>
+++++#include <linux/spinlock.h>
+++++#include <asm/uaccess.h>
+++++
+++++int count = 0;
+++++spinlock_t my_lock;
+++++asmlinkage long sys_get_unique_id(int *uuid)
+++++{
+++++	if (!access_ok(int*, uuid, sizeof(int)))
+++++		return -EFAULT;
+++++	spin_lock(&my_lock);
+++++	count = count + 1;	
+++++	put_user(count, uuid);
+++++	spin_unlock(&my_lock);
+++++	return 0;
+++++}
++++diff --git a/kernel/hello_world.c b/kernel/hello_world.c
++++new file mode 100644
++++index 0000000..1e0b345
++++--- /dev/null
+++++++ b/kernel/hello_world.c
++++@@ -0,0 +1,7 @@
+++++#include <linux/linkage.h>
+++++#include <linux/kernel.h>
+++++asmlinkage long sys_hello_world(int i)
+++++{
+++++	printk("Hello world syscall: %d\n",i);
+++++	return 0;
+++++}
++diff --git a/linux-3.18.3 b/linux-3.18.3
++new file mode 160000
++index 0000000..1bce8c5
++--- /dev/null
+++++ b/linux-3.18.3
++@@ -0,0 +1 @@
+++Subproject commit 1bce8c5c6d565c1b7720709e1a83cf418d19618f
++diff --git a/patch b/patch
++new file mode 100644
++index 0000000..491a3a9
++--- /dev/null
+++++ b/patch
++@@ -0,0 +1,374 @@
+++diff --git a/Hello b/Hello
+++new file mode 100644
+++index 0000000..e69de29
+++diff --git a/arch/x86/syscalls/syscall_32.tbl b/arch/x86/syscalls/syscall_32.tbl
+++index 9fe1b5d..0d804c7 100644
+++--- a/arch/x86/syscalls/syscall_32.tbl
++++++ b/arch/x86/syscalls/syscall_32.tbl
+++@@ -364,3 +364,5 @@
+++ 355	i386	getrandom		sys_getrandom
+++ 356	i386	memfd_create		sys_memfd_create
+++ 357	i386	bpf			sys_bpf
++++358	i386	hello_world		sys_hello_world
++++359	i386	get_unique_id		sys_get_unique_id
+++diff --git a/arch/x86/syscalls/syscall_64.tbl b/arch/x86/syscalls/syscall_64.tbl
+++index 281150b..845b59d 100644
+++--- a/arch/x86/syscalls/syscall_64.tbl
++++++ b/arch/x86/syscalls/syscall_64.tbl
+++@@ -366,3 +366,5 @@
+++ 542	x32	getsockopt		compat_sys_getsockopt
+++ 543	x32	io_setup		compat_sys_io_setup
+++ 544	x32	io_submit		compat_sys_io_submit
++++545	common	hello_world		sys_hello_world
++++546	common	get_unique_id		sys_get_unique_id
+++diff --git a/create_patch.sh b/create_patch.sh
+++new file mode 100755
+++index 0000000..df97ba3
+++--- /dev/null
++++++ b/create_patch.sh
+++@@ -0,0 +1,22 @@
++++#!/bin/bash
++++
++++REFERENCE_COMMIT="1bce8c5c"
++++
++++if [ $# -ne 1 ]; then
++++    echo "Usage: $0 PATCH_FILE_NAME"
++++fi
++++
++++if [ -f $1 ]; then
++++    echo "File $1 already exists. Quitting."
++++    exit 1
++++fi
++++
++++pushd .
++++cd /usr/src/linux
++++make distclean
++++git checkout .config
++++git -c core.fileMode=false add -A
++++git commit -m "Student solution patch"
++++git -c core.fileMode=false diff $REFERENCE_COMMIT HEAD > $1
++++popd
++++mv /usr/src/linux/$1 .
+++diff --git a/include/linux/syscalls.h b/include/linux/syscalls.h
+++index bda9b81..829c8ff 100644
+++--- a/include/linux/syscalls.h
++++++ b/include/linux/syscalls.h
+++@@ -877,4 +877,6 @@ asmlinkage long sys_seccomp(unsigned int op, unsigned int flags,
+++ asmlinkage long sys_getrandom(char __user *buf, size_t count,
+++ 			      unsigned int flags);
+++ asmlinkage long sys_bpf(int cmd, union bpf_attr *attr, unsigned int size);
++++asmlinkage long sys_hello_world(int i);
++++asmlinkage long sys_get_unique_id(int* uuid);
+++ #endif
+++diff --git a/kernel/Makefile b/kernel/Makefile
+++index 17ea6d4..e542bb4 100644
+++--- a/kernel/Makefile
++++++ b/kernel/Makefile
+++@@ -2,7 +2,8 @@
+++ # Makefile for the linux kernel.
+++ #
+++ 
+++-obj-y     = fork.o exec_domain.o panic.o \
++++obj-y     = get_child_pids.o get_unique_id.o hello_world.o fork.o \
++++	exec_domain.o panic.o \
+++ 	    cpu.o exit.o softirq.o resource.o \
+++ 	    sysctl.o sysctl_binary.o capability.o ptrace.o user.o \
+++ 	    signal.o sys.o kmod.o workqueue.o pid.o task_work.o \
+++diff --git a/kernel/get_child_pids.c b/kernel/get_child_pids.c
+++new file mode 100644
+++index 0000000..faf03e6
+++--- /dev/null
++++++ b/kernel/get_child_pids.c
+++@@ -0,0 +1,17 @@
++++#include <linux/types.h>
++++#include <linux/spinlock.h>
++++#include <asm/uaccess.h>
++++#include <linux/sched.h>
++++#include <linux/list.h>
++++#include <linux/sys.h>
++++#include <linux/slab.h>
++++
++++asmlinkage long sys_get_child_pids(pid_t* list, size_t limit, size_t* num_children)
++++{
++++	if(!access_ok(pid_t*, list, sizeof(pid_t)))
++++		return -EFAULT;
++++	else {
++++		task_struct* current = find_task_by_vpid(getpid());
++++	}
++++	return 0;
++++}		
+++diff --git a/kernel/get_unique_id.c b/kernel/get_unique_id.c
+++new file mode 100644
+++index 0000000..10751bd
+++--- /dev/null
++++++ b/kernel/get_unique_id.c
+++@@ -0,0 +1,19 @@
++++#include <linux/linkage.h>
++++#include <linux/kernel.h>
++++#include <linux/types.h>
++++#include <asm/atomic.h>
++++#include <linux/spinlock.h>
++++#include <asm/uaccess.h>
++++
++++int count = 0;
++++spinlock_t my_lock;
++++asmlinkage long sys_get_unique_id(int *uuid)
++++{
++++	if (!access_ok(int*, uuid, sizeof(int)))
++++		return -EFAULT;
++++	spin_lock(&my_lock);
++++	count = count + 1;	
++++	put_user(count, uuid);
++++	spin_unlock(&my_lock);
++++	return 0;
++++}
+++diff --git a/kernel/hello_world.c b/kernel/hello_world.c
+++new file mode 100644
+++index 0000000..1e0b345
+++--- /dev/null
++++++ b/kernel/hello_world.c
+++@@ -0,0 +1,7 @@
++++#include <linux/linkage.h>
++++#include <linux/kernel.h>
++++asmlinkage long sys_hello_world(int i)
++++{
++++	printk("Hello world syscall: %d\n",i);
++++	return 0;
++++}
+++diff --git a/kernel/patch1 b/kernel/patch1
+++new file mode 100644
+++index 0000000..dcb50fc
+++--- /dev/null
++++++ b/kernel/patch1
+++@@ -0,0 +1,224 @@
++++diff --git a/Hello b/Hello
++++new file mode 100644
++++index 0000000..e69de29
++++diff --git a/arch/x86/syscalls/syscall_32.tbl b/arch/x86/syscalls/syscall_32.tbl
++++index 9fe1b5d..0d804c7 100644
++++--- a/arch/x86/syscalls/syscall_32.tbl
+++++++ b/arch/x86/syscalls/syscall_32.tbl
++++@@ -364,3 +364,5 @@
++++ 355	i386	getrandom		sys_getrandom
++++ 356	i386	memfd_create		sys_memfd_create
++++ 357	i386	bpf			sys_bpf
+++++358	i386	hello_world		sys_hello_world
+++++359	i386	get_unique_id		sys_get_unique_id
++++diff --git a/arch/x86/syscalls/syscall_64.tbl b/arch/x86/syscalls/syscall_64.tbl
++++index 281150b..845b59d 100644
++++--- a/arch/x86/syscalls/syscall_64.tbl
+++++++ b/arch/x86/syscalls/syscall_64.tbl
++++@@ -366,3 +366,5 @@
++++ 542	x32	getsockopt		compat_sys_getsockopt
++++ 543	x32	io_setup		compat_sys_io_setup
++++ 544	x32	io_submit		compat_sys_io_submit
+++++545	common	hello_world		sys_hello_world
+++++546	common	get_unique_id		sys_get_unique_id
++++diff --git a/include/linux/syscalls.h b/include/linux/syscalls.h
++++index bda9b81..829c8ff 100644
++++--- a/include/linux/syscalls.h
+++++++ b/include/linux/syscalls.h
++++@@ -877,4 +877,6 @@ asmlinkage long sys_seccomp(unsigned int op, unsigned int flags,
++++ asmlinkage long sys_getrandom(char __user *buf, size_t count,
++++ 			      unsigned int flags);
++++ asmlinkage long sys_bpf(int cmd, union bpf_attr *attr, unsigned int size);
+++++asmlinkage long sys_hello_world(int i);
+++++asmlinkage long sys_get_unique_id(int* uuid);
++++ #endif
++++diff --git a/kernel/Makefile b/kernel/Makefile
++++index 17ea6d4..e542bb4 100644
++++--- a/kernel/Makefile
+++++++ b/kernel/Makefile
++++@@ -2,7 +2,8 @@
++++ # Makefile for the linux kernel.
++++ #
++++ 
++++-obj-y     = fork.o exec_domain.o panic.o \
+++++obj-y     = get_child_pids.o get_unique_id.o hello_world.o fork.o \
+++++	exec_domain.o panic.o \
++++ 	    cpu.o exit.o softirq.o resource.o \
++++ 	    sysctl.o sysctl_binary.o capability.o ptrace.o user.o \
++++ 	    signal.o sys.o kmod.o workqueue.o pid.o task_work.o \
++++diff --git a/kernel/get_child_pids.c b/kernel/get_child_pids.c
++++new file mode 100644
++++index 0000000..faf03e6
++++--- /dev/null
+++++++ b/kernel/get_child_pids.c
++++@@ -0,0 +1,17 @@
+++++#include <linux/types.h>
+++++#include <linux/spinlock.h>
+++++#include <asm/uaccess.h>
+++++#include <linux/sched.h>
+++++#include <linux/list.h>
+++++#include <linux/sys.h>
+++++#include <linux/slab.h>
+++++
+++++asmlinkage long sys_get_child_pids(pid_t* list, size_t limit, size_t* num_children)
+++++{
+++++	if(!access_ok(pid_t*, list, sizeof(pid_t)))
+++++		return -EFAULT;
+++++	else {
+++++		task_struct* current = find_task_by_vpid(getpid());
+++++	}
+++++	return 0;
+++++}		
++++diff --git a/kernel/get_unique_id.c b/kernel/get_unique_id.c
++++new file mode 100644
++++index 0000000..10751bd
++++--- /dev/null
+++++++ b/kernel/get_unique_id.c
++++@@ -0,0 +1,19 @@
+++++#include <linux/linkage.h>
+++++#include <linux/kernel.h>
+++++#include <linux/types.h>
+++++#include <asm/atomic.h>
+++++#include <linux/spinlock.h>
+++++#include <asm/uaccess.h>
+++++
+++++int count = 0;
+++++spinlock_t my_lock;
+++++asmlinkage long sys_get_unique_id(int *uuid)
+++++{
+++++	if (!access_ok(int*, uuid, sizeof(int)))
+++++		return -EFAULT;
+++++	spin_lock(&my_lock);
+++++	count = count + 1;	
+++++	put_user(count, uuid);
+++++	spin_unlock(&my_lock);
+++++	return 0;
+++++}
++++diff --git a/kernel/hello_world.c b/kernel/hello_world.c
++++new file mode 100644
++++index 0000000..1e0b345
++++--- /dev/null
+++++++ b/kernel/hello_world.c
++++@@ -0,0 +1,7 @@
+++++#include <linux/linkage.h>
+++++#include <linux/kernel.h>
+++++asmlinkage long sys_hello_world(int i)
+++++{
+++++	printk("Hello world syscall: %d\n",i);
+++++	return 0;
+++++}
++++diff --git a/patch1 b/patch1
++++new file mode 100644
++++index 0000000..ca72378
++++--- /dev/null
+++++++ b/patch1
++++@@ -0,0 +1,109 @@
+++++diff --git a/Hello b/Hello
+++++new file mode 100644
+++++index 0000000..e69de29
+++++diff --git a/arch/x86/syscalls/syscall_32.tbl b/arch/x86/syscalls/syscall_32.tbl
+++++index 9fe1b5d..0d804c7 100644
+++++--- a/arch/x86/syscalls/syscall_32.tbl
++++++++ b/arch/x86/syscalls/syscall_32.tbl
+++++@@ -364,3 +364,5 @@
+++++ 355	i386	getrandom		sys_getrandom
+++++ 356	i386	memfd_create		sys_memfd_create
+++++ 357	i386	bpf			sys_bpf
++++++358	i386	hello_world		sys_hello_world
++++++359	i386	get_unique_id		sys_get_unique_id
+++++diff --git a/arch/x86/syscalls/syscall_64.tbl b/arch/x86/syscalls/syscall_64.tbl
+++++index 281150b..845b59d 100644
+++++--- a/arch/x86/syscalls/syscall_64.tbl
++++++++ b/arch/x86/syscalls/syscall_64.tbl
+++++@@ -366,3 +366,5 @@
+++++ 542	x32	getsockopt		compat_sys_getsockopt
+++++ 543	x32	io_setup		compat_sys_io_setup
+++++ 544	x32	io_submit		compat_sys_io_submit
++++++545	common	hello_world		sys_hello_world
++++++546	common	get_unique_id		sys_get_unique_id
+++++diff --git a/include/linux/syscalls.h b/include/linux/syscalls.h
+++++index bda9b81..829c8ff 100644
+++++--- a/include/linux/syscalls.h
++++++++ b/include/linux/syscalls.h
+++++@@ -877,4 +877,6 @@ asmlinkage long sys_seccomp(unsigned int op, unsigned int flags,
+++++ asmlinkage long sys_getrandom(char __user *buf, size_t count,
+++++ 			      unsigned int flags);
+++++ asmlinkage long sys_bpf(int cmd, union bpf_attr *attr, unsigned int size);
++++++asmlinkage long sys_hello_world(int i);
++++++asmlinkage long sys_get_unique_id(int* uuid);
+++++ #endif
+++++diff --git a/kernel/Makefile b/kernel/Makefile
+++++index 17ea6d4..e542bb4 100644
+++++--- a/kernel/Makefile
++++++++ b/kernel/Makefile
+++++@@ -2,7 +2,8 @@
+++++ # Makefile for the linux kernel.
+++++ #
+++++ 
+++++-obj-y     = fork.o exec_domain.o panic.o \
++++++obj-y     = get_child_pids.o get_unique_id.o hello_world.o fork.o \
++++++	exec_domain.o panic.o \
+++++ 	    cpu.o exit.o softirq.o resource.o \
+++++ 	    sysctl.o sysctl_binary.o capability.o ptrace.o user.o \
+++++ 	    signal.o sys.o kmod.o workqueue.o pid.o task_work.o \
+++++diff --git a/kernel/get_child_pids.c b/kernel/get_child_pids.c
+++++new file mode 100644
+++++index 0000000..faf03e6
+++++--- /dev/null
++++++++ b/kernel/get_child_pids.c
+++++@@ -0,0 +1,17 @@
++++++#include <linux/types.h>
++++++#include <linux/spinlock.h>
++++++#include <asm/uaccess.h>
++++++#include <linux/sched.h>
++++++#include <linux/list.h>
++++++#include <linux/sys.h>
++++++#include <linux/slab.h>
++++++
++++++asmlinkage long sys_get_child_pids(pid_t* list, size_t limit, size_t* num_children)
++++++{
++++++	if(!access_ok(pid_t*, list, sizeof(pid_t)))
++++++		return -EFAULT;
++++++	else {
++++++		task_struct* current = find_task_by_vpid(getpid());
++++++	}
++++++	return 0;
++++++}		
+++++diff --git a/kernel/get_unique_id.c b/kernel/get_unique_id.c
+++++new file mode 100644
+++++index 0000000..10751bd
+++++--- /dev/null
++++++++ b/kernel/get_unique_id.c
+++++@@ -0,0 +1,19 @@
++++++#include <linux/linkage.h>
++++++#include <linux/kernel.h>
++++++#include <linux/types.h>
++++++#include <asm/atomic.h>
++++++#include <linux/spinlock.h>
++++++#include <asm/uaccess.h>
++++++
++++++int count = 0;
++++++spinlock_t my_lock;
++++++asmlinkage long sys_get_unique_id(int *uuid)
++++++{
++++++	if (!access_ok(int*, uuid, sizeof(int)))
++++++		return -EFAULT;
++++++	spin_lock(&my_lock);
++++++	count = count + 1;	
++++++	put_user(count, uuid);
++++++	spin_unlock(&my_lock);
++++++	return 0;
++++++}
+++++diff --git a/kernel/hello_world.c b/kernel/hello_world.c
+++++new file mode 100644
+++++index 0000000..1e0b345
+++++--- /dev/null
++++++++ b/kernel/hello_world.c
+++++@@ -0,0 +1,7 @@
++++++#include <linux/linkage.h>
++++++#include <linux/kernel.h>
++++++asmlinkage long sys_hello_world(int i)
++++++{
++++++	printk("Hello world syscall: %d\n",i);
++++++	return 0;
++++++}
+++diff --git a/linux-3.18.3 b/linux-3.18.3
+++new file mode 160000
+++index 0000000..1bce8c5
+++--- /dev/null
++++++ b/linux-3.18.3
+++@@ -0,0 +1 @@
++++Subproject commit 1bce8c5c6d565c1b7720709e1a83cf418d19618f
